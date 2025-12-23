@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { format, addDays, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Check, Calendar as CalendarIcon, Clock, MapPin } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CourtCard from "@/components/CourtCard";
@@ -10,18 +11,15 @@ import TimeSlot from "@/components/TimeSlot";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
-// Mock data for courts
-const courts = [
-  { id: 1, name: "Pista 1", type: "indoor" as const },
-  { id: 2, name: "Pista 2", type: "indoor" as const },
-  { id: 3, name: "Pista 3", type: "indoor" as const },
-  { id: 4, name: "Pista 4", type: "indoor" as const },
-  { id: 5, name: "Pista 5", type: "outdoor" as const },
-  { id: 6, name: "Pista 6", type: "outdoor" as const },
-  { id: 7, name: "Pista 7", type: "outdoor" as const },
-  { id: 8, name: "Pista 8", type: "outdoor" as const },
-];
+interface Court {
+  id: number;
+  name: string;
+  type: "indoor" | "outdoor";
+  is_active: boolean;
+}
 
 // Generate time slots from 09:00 to 23:00 (75 min blocks)
 const generateTimeSlots = () => {
@@ -44,26 +42,61 @@ const generateTimeSlots = () => {
 
 const timeSlots = generateTimeSlots();
 
-// Mock unavailable slots (random for demo)
-const getUnavailableSlots = (courtId: number, date: Date) => {
-  const seed = courtId + date.getDate();
-  return timeSlots.filter((_, index) => (index + seed) % 4 === 0);
-};
-
 const Reservar = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedCourt, setSelectedCourt] = useState<number | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [step, setStep] = useState(1);
+  const [courts, setCourts] = useState<Court[]>([]);
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Generate next 7 days
   const dates = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
   }, []);
 
-  const unavailableSlots = useMemo(() => {
-    if (!selectedCourt) return [];
-    return getUnavailableSlots(selectedCourt, selectedDate);
+  // Fetch courts
+  useEffect(() => {
+    const fetchCourts = async () => {
+      const { data } = await supabase
+        .from("courts")
+        .select("*")
+        .eq("is_active", true)
+        .order("id");
+
+      if (data) {
+        setCourts(data as Court[]);
+      }
+    };
+
+    fetchCourts();
+  }, []);
+
+  // Fetch booked slots for selected court and date
+  useEffect(() => {
+    const fetchBookedSlots = async () => {
+      if (!selectedCourt) {
+        setBookedSlots([]);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("bookings")
+        .select("start_time")
+        .eq("court_id", selectedCourt)
+        .eq("booking_date", format(selectedDate, "yyyy-MM-dd"))
+        .eq("status", "confirmed");
+
+      if (data) {
+        setBookedSlots(data.map((b) => b.start_time.slice(0, 5)));
+      }
+    };
+
+    fetchBookedSlots();
   }, [selectedCourt, selectedDate]);
 
   const handleDateChange = (date: Date) => {
@@ -82,15 +115,56 @@ const Reservar = () => {
     setStep(3);
   };
 
-  const handleConfirm = () => {
-    const court = courts.find((c) => c.id === selectedCourt);
-    toast.success("¡Reserva confirmada!", {
-      description: `${court?.name} - ${format(selectedDate, "d 'de' MMMM", { locale: es })} a las ${selectedTime}`,
-    });
-    // Reset form
-    setSelectedCourt(null);
-    setSelectedTime(null);
-    setStep(1);
+  const handleConfirm = async () => {
+    if (!user) {
+      toast.error("Debes iniciar sesión para reservar", {
+        description: "Serás redirigido a la página de login.",
+      });
+      navigate("/login");
+      return;
+    }
+
+    if (!selectedCourt || !selectedTime) return;
+
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase.from("bookings").insert({
+        user_id: user.id,
+        court_id: selectedCourt,
+        booking_date: format(selectedDate, "yyyy-MM-dd"),
+        start_time: selectedTime + ":00",
+        duration_minutes: 75,
+        status: "confirmed",
+      });
+
+      if (error) {
+        if (error.message.includes("unique")) {
+          toast.error("Horario no disponible", {
+            description: "Este horario ya ha sido reservado.",
+          });
+        } else {
+          throw error;
+        }
+      } else {
+        const court = courts.find((c) => c.id === selectedCourt);
+        toast.success("¡Reserva confirmada!", {
+          description: `${court?.name} - ${format(selectedDate, "d 'de' MMMM", { locale: es })} a las ${selectedTime}`,
+        });
+
+        // Reset form
+        setSelectedCourt(null);
+        setSelectedTime(null);
+        setStep(1);
+
+        // Navigate to profile
+        navigate("/perfil");
+      }
+    } catch (error) {
+      toast.error("Error al crear la reserva");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const selectedCourtData = courts.find((c) => c.id === selectedCourt);
@@ -212,7 +286,7 @@ const Reservar = () => {
                     <TimeSlot
                       key={time}
                       time={time}
-                      isAvailable={!unavailableSlots.includes(time)}
+                      isAvailable={!bookedSlots.includes(time)}
                       isSelected={selectedTime === time}
                       onClick={() => handleTimeSelect(time)}
                     />
@@ -262,6 +336,12 @@ const Reservar = () => {
                     </div>
                   </div>
 
+                  {!user && (
+                    <p className="text-sm text-muted-foreground text-center mb-4">
+                      Debes iniciar sesión para confirmar la reserva
+                    </p>
+                  )}
+
                   <div className="flex gap-3">
                     <Button
                       variant="outline"
@@ -279,9 +359,33 @@ const Reservar = () => {
                       size="lg"
                       className="flex-1"
                       onClick={handleConfirm}
+                      disabled={isLoading}
                     >
-                      <Check className="w-5 h-5 mr-2" />
-                      Confirmar
+                      {isLoading ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                              fill="none"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            />
+                          </svg>
+                        </span>
+                      ) : (
+                        <>
+                          <Check className="w-5 h-5 mr-2" />
+                          {user ? "Confirmar" : "Iniciar Sesión"}
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
