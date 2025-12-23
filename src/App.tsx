@@ -10,6 +10,7 @@ import Reservar from "./pages/Reservar";
 import Pistas from "./pages/Pistas";
 import Login from "./pages/Login";
 import Perfil from "./pages/Perfil";
+import BookingPage from "./pages/BookingPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
               <Route path="/pistas" element={<Pistas />} />
               <Route path="/login" element={<Login />} />
               <Route path="/perfil" element={<Perfil />} />
+              <Route path="/booking/:token" element={<BookingPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

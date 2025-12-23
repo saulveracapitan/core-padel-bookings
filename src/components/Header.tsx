@@ -29,9 +29,7 @@ const Header = () => {
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-              <div className="w-4 h-4 rounded-full bg-accent" />
-            </div>
+            <img src="/logo.png" alt="Core Padel Logo" className="w-10 h-10 object-contain" />
             <span className="font-heading font-bold text-xl text-primary">
               Core Padel
             </span>

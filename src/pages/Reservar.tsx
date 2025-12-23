@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { format, addDays, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Check, Calendar as CalendarIcon, Clock, MapPin } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Check, Calendar as CalendarIcon, Clock, MapPin, User, Users, CreditCard, Copy, Share2 } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CourtCard from "@/components/CourtCard";
@@ -50,6 +50,10 @@ const Reservar = () => {
   const [courts, setCourts] = useState<Court[]>([]);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [paymentType, setPaymentType] = useState<"full" | "split">("full");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [lastBookingId, setLastBookingId] = useState<string | null>(null);
+  const [shareToken, setShareToken] = useState<string | null>(null);
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -112,7 +116,7 @@ const Reservar = () => {
 
   const handleTimeSelect = (time: string) => {
     setSelectedTime(time);
-    setStep(3);
+    setStep(4);
   };
 
   const handleConfirm = async () => {
@@ -129,14 +133,19 @@ const Reservar = () => {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.from("bookings").insert({
+      const token = crypto.randomUUID();
+
+      const { data, error } = await supabase.from("bookings").insert({
         user_id: user.id,
         court_id: selectedCourt,
         booking_date: format(selectedDate, "yyyy-MM-dd"),
         start_time: selectedTime + ":00",
         duration_minutes: 75,
         status: "confirmed",
-      });
+        payment_type: paymentType,
+        payment_status: paymentType === "full" ? "paid" : "partial",
+        share_token: token
+      }).select().single();
 
       if (error) {
         if (error.message.includes("unique")) {
@@ -144,26 +153,74 @@ const Reservar = () => {
             description: "Este horario ya ha sido reservado.",
           });
         } else {
-          throw error;
+          // Fallback for missing columns if migration wasn't applied
+          console.error("Error with new fields, trying fallback...", error);
+          const { error: fallbackError } = await supabase.from("bookings").insert({
+            user_id: user.id,
+            court_id: selectedCourt,
+            booking_date: format(selectedDate, "yyyy-MM-dd"),
+            start_time: selectedTime + ":00",
+            duration_minutes: 75,
+            status: "confirmed",
+          });
+
+          if (fallbackError) throw fallbackError;
+
+          // If fallback worked, show success but without share features
+          toast.success("¡Reserva confirmada!");
+          navigate("/perfil");
+          return;
         }
       } else {
-        const court = courts.find((c) => c.id === selectedCourt);
-        toast.success("¡Reserva confirmada!", {
-          description: `${court?.name} - ${format(selectedDate, "d 'de' MMMM", { locale: es })} a las ${selectedTime}`,
+        // Add owner to participants
+        const { error: participantError } = await supabase.from("booking_participants").insert({
+          booking_id: data.id,
+          user_id: user.id,
+          role: "owner",
+          payment_status: paymentType === "full" ? "paid" : "pending"
         });
 
-        // Reset form
-        setSelectedCourt(null);
-        setSelectedTime(null);
-        setStep(1);
+        if (participantError) {
+          console.error("Error adding participant:", participantError);
+          toast.warning("Reserva creada, pero hubo un problema al registrar participantes. Por favor, contacta con soporte.", {
+            description: "La tabla booking_participants podría no existir en la base de datos.",
+            duration: 5000,
+          });
+        }
 
-        // Navigate to profile
-        navigate("/perfil");
+        setLastBookingId(data.id);
+        setShareToken(token);
+        setShowSuccess(true);
+        toast.success("¡Reserva confirmada!");
       }
     } catch (error) {
+      console.error(error);
       toast.error("Error al crear la reserva");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    const url = `${window.location.origin}/booking/${shareToken}`;
+    navigator.clipboard.writeText(url);
+    toast.success("Enlace copiado al portapapeles");
+  };
+
+  const shareBooking = async () => {
+    const url = `${window.location.origin}/booking/${shareToken}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Reserva de Padel',
+          text: `Únete a mi partida de pádel el ${format(selectedDate, "d 'de' MMMM", { locale: es })} a las ${selectedTime}`,
+          url: url,
+        });
+      } catch (err) {
+        console.error('Error sharing:', err);
+      }
+    } else {
+      copyToClipboard();
     }
   };
 
@@ -190,89 +247,95 @@ const Reservar = () => {
                 Reservar Pista
               </h1>
               <p className="text-muted-foreground">
-                Selecciona fecha, pista y horario en solo 3 pasos
+                Selecciona fecha, pista, horario y método de pago
               </p>
             </div>
 
             {/* Progress Steps */}
-            <div className="flex items-center justify-center gap-2 mb-8 md:mb-12">
-              {[1, 2, 3].map((s) => (
-                <div key={s} className="flex items-center">
-                  <div
-                    className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all",
-                      step >= s
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-muted text-muted-foreground"
-                    )}
-                  >
-                    {step > s ? <Check className="w-4 h-4" /> : s}
-                  </div>
-                  {s < 3 && (
+            {!showSuccess && (
+              <div className="flex items-center justify-center gap-2 mb-8 md:mb-12">
+                {[1, 2, 3, 4].map((s) => (
+                  <div key={s} className="flex items-center">
                     <div
                       className={cn(
-                        "w-8 md:w-16 h-1 mx-1",
-                        step > s ? "bg-accent" : "bg-muted"
+                        "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all",
+                        step >= s
+                          ? "bg-accent text-accent-foreground"
+                          : "bg-muted text-muted-foreground"
                       )}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
+                    >
+                      {step > s ? <Check className="w-4 h-4" /> : s}
+                    </div>
+                    {s < 4 && (
+                      <div
+                        className={cn(
+                          "w-8 md:w-16 h-1 mx-1",
+                          step > s ? "bg-accent" : "bg-muted"
+                        )}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Date Selector */}
-            <div className="mb-8">
-              <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-accent" />
-                Selecciona fecha
-              </h2>
-              <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0">
-                {dates.map((date) => (
-                  <button
-                    key={date.toISOString()}
-                    onClick={() => handleDateChange(date)}
-                    className={cn(
-                      "flex-shrink-0 px-4 py-3 rounded-xl text-center transition-all duration-200 min-w-[80px]",
-                      isSameDay(date, selectedDate)
-                        ? "bg-accent text-accent-foreground shadow-accent"
-                        : "bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground"
-                    )}
-                  >
-                    <p className="text-xs font-medium opacity-80">
-                      {format(date, "EEE", { locale: es })}
-                    </p>
-                    <p className="text-xl font-bold">{format(date, "d")}</p>
-                    <p className="text-xs opacity-80">
-                      {format(date, "MMM", { locale: es })}
-                    </p>
-                  </button>
-                ))}
+            {!showSuccess && (
+              <div className="mb-8 animate-fade-in">
+                <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2">
+                  <CalendarIcon className="w-5 h-5 text-accent" />
+                  Selecciona fecha
+                </h2>
+                <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0">
+                  {dates.map((date) => (
+                    <button
+                      key={date.toISOString()}
+                      onClick={() => handleDateChange(date)}
+                      className={cn(
+                        "flex-shrink-0 px-4 py-3 rounded-xl text-center transition-all duration-200 min-w-[80px]",
+                        isSameDay(date, selectedDate)
+                          ? "bg-accent text-accent-foreground shadow-accent"
+                          : "bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground"
+                      )}
+                    >
+                      <p className="text-xs font-medium opacity-80">
+                        {format(date, "EEE", { locale: es })}
+                      </p>
+                      <p className="text-xl font-bold">{format(date, "d")}</p>
+                      <p className="text-xs opacity-80">
+                        {format(date, "MMM", { locale: es })}
+                      </p>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Court Selection */}
-            <div className="mb-8">
-              <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-accent" />
-                Selecciona pista
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {courts.map((court) => (
-                  <CourtCard
-                    key={court.id}
-                    id={court.id}
-                    name={court.name}
-                    type={court.type}
-                    isAvailable={true}
-                    isSelected={selectedCourt === court.id}
-                    onClick={() => handleCourtSelect(court.id)}
-                  />
-                ))}
+            {!showSuccess && (
+              <div className="mb-8 animate-fade-in">
+                <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-accent" />
+                  Selecciona pista
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {courts.map((court) => (
+                    <CourtCard
+                      key={court.id}
+                      id={court.id}
+                      name={court.name}
+                      type={court.type}
+                      isAvailable={true}
+                      isSelected={selectedCourt === court.id}
+                      onClick={() => handleCourtSelect(court.id)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Time Selection */}
-            {selectedCourt && (
+            {!showSuccess && selectedCourt && (
               <div className="mb-8 animate-fade-in">
                 <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2">
                   <Clock className="w-5 h-5 text-accent" />
@@ -295,12 +358,12 @@ const Reservar = () => {
               </div>
             )}
 
-            {/* Confirmation */}
-            {selectedTime && selectedCourtData && (
+            {/* Confirmation & Payment */}
+            {!showSuccess && selectedTime && selectedCourtData && step === 4 && (
               <div className="animate-slide-up">
                 <div className="bg-card border border-accent/30 rounded-2xl p-6 md:p-8 shadow-medium max-w-xl mx-auto">
                   <h3 className="font-heading font-bold text-xl text-center mb-6">
-                    Confirma tu reserva
+                    Resumen y Pago
                   </h3>
 
                   <div className="space-y-4 mb-6">
@@ -336,6 +399,46 @@ const Reservar = () => {
                     </div>
                   </div>
 
+                  {/* Payment Options */}
+                  <div className="mb-8">
+                    <h4 className="font-semibold mb-4">Método de pago</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div
+                        className={cn(
+                          "cursor-pointer border-2 rounded-xl p-4 transition-all",
+                          paymentType === "full"
+                            ? "border-accent bg-accent/5"
+                            : "border-border hover:border-accent/50"
+                        )}
+                        onClick={() => setPaymentType("full")}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold">Pagar todo</span>
+                          <User className="w-5 h-5 text-accent" />
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">24,00 €</p>
+                        <p className="text-xs text-muted-foreground mt-1">Pago completo de la pista</p>
+                      </div>
+
+                      <div
+                        className={cn(
+                          "cursor-pointer border-2 rounded-xl p-4 transition-all",
+                          paymentType === "split"
+                            ? "border-accent bg-accent/5"
+                            : "border-border hover:border-accent/50"
+                        )}
+                        onClick={() => setPaymentType("split")}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold">Dividir pago</span>
+                          <Users className="w-5 h-5 text-accent" />
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">6,00 €</p>
+                        <p className="text-xs text-muted-foreground mt-1">Por persona (4 jugadores)</p>
+                      </div>
+                    </div>
+                  </div>
+
                   {!user && (
                     <p className="text-sm text-muted-foreground text-center mb-4">
                       Debes iniciar sesión para confirmar la reserva
@@ -349,7 +452,7 @@ const Reservar = () => {
                       className="flex-1"
                       onClick={() => {
                         setSelectedTime(null);
-                        setStep(2);
+                        setStep(3);
                       }}
                     >
                       Modificar
@@ -383,11 +486,62 @@ const Reservar = () => {
                       ) : (
                         <>
                           <Check className="w-5 h-5 mr-2" />
-                          {user ? "Confirmar" : "Iniciar Sesión"}
+                          {user ? "Confirmar y Pagar" : "Iniciar Sesión"}
                         </>
                       )}
                     </Button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Success View */}
+            {showSuccess && (
+              <div className="animate-slide-up max-w-xl mx-auto text-center">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Check className="w-10 h-10 text-green-600" />
+                </div>
+
+                <h2 className="font-heading text-3xl font-bold text-foreground mb-4">
+                  ¡Reserva Confirmada!
+                </h2>
+
+                <p className="text-muted-foreground mb-8">
+                  Tu reserva ha sido procesada correctamente.
+                  {paymentType === "split" && " Has pagado tu parte."}
+                </p>
+
+                <div className="bg-card border border-border rounded-2xl p-6 mb-8 text-left">
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    <Share2 className="w-5 h-5 text-accent" />
+                    {paymentType === "split" ? "Dividir pago y jugar" : "Invitar amigos"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {paymentType === "split"
+                      ? "Envía este enlace a tus amigos para que puedan pagar su parte y unirse."
+                      : "Comparte este enlace para que tus amigos se unan al partido."}
+                  </p>
+
+                  <div className="flex gap-2">
+                    <div className="flex-1 bg-secondary rounded-lg px-4 py-3 text-sm font-mono truncate border border-border">
+                      {`${window.location.origin}/booking/${shareToken}`}
+                    </div>
+                    <Button variant="outline" size="icon" onClick={copyToClipboard}>
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                    <Button variant="accent" size="icon" onClick={shareBooking}>
+                      <Share2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 justify-center">
+                  <Button variant="outline" asChild>
+                    <Link to="/">Volver al Inicio</Link>
+                  </Button>
+                  <Button variant="accent" asChild>
+                    <Link to="/perfil">Ir a Mis Reservas</Link>
+                  </Button>
                 </div>
               </div>
             )}

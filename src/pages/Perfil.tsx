@@ -18,6 +18,7 @@ interface Booking {
   start_time: string;
   duration_minutes: number;
   status: string;
+  share_token: string;
   court: {
     id: number;
     name: string;
@@ -67,6 +68,7 @@ const Perfil = () => {
             start_time,
             duration_minutes,
             status,
+            share_token,
             court:courts(id, name, type)
           `)
           .eq("user_id", user.id)
@@ -250,15 +252,26 @@ const Perfil = () => {
                           </div>
                         </div>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCancelBooking(booking.id)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Cancelar
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCancelBooking(booking.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Cancelar
+                        </Button>
+                        <Button
+                          variant="accent"
+                          size="sm"
+                          asChild
+                        >
+                          <Link to={`/booking/${booking.share_token}`}>
+                            Ver Detalles
+                          </Link>
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
