@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Calendar, User, LogIn } from "lucide-react";
+import { Menu, X, Calendar, User, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const { user, signOut } = useAuth();
 
   const navLinks = [
     { href: "/", label: "Inicio" },
@@ -15,6 +17,11 @@ const Header = () => {
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleSignOut = async () => {
+    await signOut();
+    setIsMenuOpen(false);
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
@@ -50,18 +57,37 @@ const Header = () => {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/login">
-                <LogIn className="w-4 h-4 mr-2" />
-                Iniciar Sesión
-              </Link>
-            </Button>
-            <Button variant="accent" size="sm" asChild>
-              <Link to="/reservar">
-                <Calendar className="w-4 h-4 mr-2" />
-                Reservar Ahora
-              </Link>
-            </Button>
+            {user ? (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/perfil">
+                    <User className="w-4 h-4 mr-2" />
+                    Mi Perfil
+                  </Link>
+                </Button>
+                <Button variant="accent" size="sm" asChild>
+                  <Link to="/reservar">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Reservar
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/login">
+                    <LogIn className="w-4 h-4 mr-2" />
+                    Iniciar Sesión
+                  </Link>
+                </Button>
+                <Button variant="accent" size="sm" asChild>
+                  <Link to="/reservar">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Reservar Ahora
+                  </Link>
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -94,18 +120,35 @@ const Header = () => {
                 </Link>
               ))}
               <div className="flex flex-col gap-2 mt-4 px-4">
-                <Button variant="outline" asChild>
-                  <Link to="/login" onClick={() => setIsMenuOpen(false)}>
-                    <LogIn className="w-4 h-4 mr-2" />
-                    Iniciar Sesión
-                  </Link>
-                </Button>
-                <Button variant="accent" asChild>
-                  <Link to="/reservar" onClick={() => setIsMenuOpen(false)}>
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Reservar Ahora
-                  </Link>
-                </Button>
+                {user ? (
+                  <>
+                    <Button variant="outline" asChild>
+                      <Link to="/perfil" onClick={() => setIsMenuOpen(false)}>
+                        <User className="w-4 h-4 mr-2" />
+                        Mi Perfil
+                      </Link>
+                    </Button>
+                    <Button variant="ghost" onClick={handleSignOut}>
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Cerrar Sesión
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" asChild>
+                      <Link to="/login" onClick={() => setIsMenuOpen(false)}>
+                        <LogIn className="w-4 h-4 mr-2" />
+                        Iniciar Sesión
+                      </Link>
+                    </Button>
+                    <Button variant="accent" asChild>
+                      <Link to="/reservar" onClick={() => setIsMenuOpen(false)}>
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Reservar Ahora
+                      </Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </nav>
           </div>
