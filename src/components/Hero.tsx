@@ -75,7 +75,7 @@ const Hero = () => {
               </div>
               <div>
                 <p className="text-sm text-primary-foreground/60">Ubicación</p>
-                <p className="font-semibold text-primary-foreground">Madrid Centro</p>
+                <p className="font-semibold text-primary-foreground">Corbera de Llobregat</p>
               </div>
             </div>
 
