@@ -1,4 +1,4 @@
-import { Sun, Home, Users, Check } from "lucide-react";
+import { Sun, Home, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CourtCardProps {
@@ -58,14 +58,6 @@ const CourtCard = ({ id, name, type, isAvailable, isSelected, onClick }: CourtCa
 
       {/* Court Name */}
       <h3 className="font-heading font-bold text-lg text-foreground mb-2">{name}</h3>
-
-      {/* Court Info */}
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <Users className="w-4 h-4" />
-          <span>2-4 jugadores</span>
-        </div>
-      </div>
 
       {/* Availability */}
       <div className="mt-4 pt-4 border-t border-border">

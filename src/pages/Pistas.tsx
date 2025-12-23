@@ -1,6 +1,6 @@
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
-import { Sun, Home, Users, ArrowRight, Wifi, Lightbulb, ShowerHead, Car } from "lucide-react";
+import { Sun, Home, ArrowRight, Wifi, Lightbulb, ShowerHead, Car } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -93,10 +93,6 @@ const Pistas = () => {
 
                       <ul className="space-y-2 text-sm text-muted-foreground mb-6">
                         <li className="flex items-center gap-2">
-                          <Users className="w-4 h-4" />
-                          2-4 jugadores
-                        </li>
-                        <li className="flex items-center gap-2">
                           <Lightbulb className="w-4 h-4" />
                           Iluminación LED
                         </li>
@@ -147,10 +143,6 @@ const Pistas = () => {
                       </h3>
 
                       <ul className="space-y-2 text-sm text-muted-foreground mb-6">
-                        <li className="flex items-center gap-2">
-                          <Users className="w-4 h-4" />
-                          2-4 jugadores
-                        </li>
                         <li className="flex items-center gap-2">
                           <Lightbulb className="w-4 h-4" />
                           Iluminación nocturna
