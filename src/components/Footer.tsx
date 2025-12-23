@@ -15,7 +15,7 @@ const Footer = () => {
               <span className="font-heading font-bold text-xl">Core Padel</span>
             </Link>
             <p className="text-primary-foreground/70 text-sm leading-relaxed mb-6">
-              Tu club de pádel de referencia en Madrid. 
+              Tu club de pádel de referencia en Corbera de Llobregat. 
               8 pistas premium para disfrutar del mejor deporte.
             </p>
             <div className="flex gap-3">

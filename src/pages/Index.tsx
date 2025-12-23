@@ -8,10 +8,10 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>Core Padel | Reserva tu pista de pádel en Madrid</title>
+        <title>Core Padel | Reserva tu pista de pádel en Corbera de Llobregat</title>
         <meta
           name="description"
-          content="Reserva tu pista de pádel online en Core Padel. 8 pistas premium en Madrid, 4 interiores y 4 exteriores. Reserva en 3 pasos, disponibilidad en tiempo real."
+          content="Reserva tu pista de pádel online en Core Padel. 8 pistas premium en Corbera de Llobregat, 4 interiores y 4 exteriores. Reserva en 3 pasos, disponibilidad en tiempo real."
         />
       </Helmet>
 

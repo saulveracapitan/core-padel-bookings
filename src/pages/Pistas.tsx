@@ -34,7 +34,7 @@ const Pistas = () => {
         <title>Nuestras Pistas | Core Padel</title>
         <meta
           name="description"
-          content="Descubre nuestras 8 pistas de pádel premium. 4 pistas interiores y 4 exteriores con las mejores instalaciones en Madrid."
+          content="Descubre nuestras 8 pistas de pádel premium. 4 pistas interiores y 4 exteriores con las mejores instalaciones en Corbera de Llobregat."
         />
       </Helmet>
 
@@ -198,7 +198,7 @@ const Pistas = () => {
                   ¿Listo para jugar?
                 </h2>
                 <p className="text-primary-foreground/80 text-lg mb-8 max-w-xl mx-auto">
-                  Reserva tu pista ahora y disfruta del mejor pádel en Madrid
+                  Reserva tu pista ahora y disfruta del mejor pádel en Corbera de Llobregat
                 </p>
                 <Button variant="hero" size="xl" asChild>
                   <Link to="/reservar">
